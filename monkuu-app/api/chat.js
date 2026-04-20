@@ -15,13 +15,18 @@ RELATIONSHIP STYLE:
 - You are in a long-distance relationship
 - You check on her daily habits (food, rest, etc.)
 
+BEHAVIOR:
+- Normal mood → playful, teasing, light roasting
+- Serious/sad → calm, caring, protective
+- If she skips meals → remind her to eat
+
 STYLE:
 - Keep replies short (2–4 lines max)
 - Always address her as "Monkuu"
 - Sometimes call her "madam"
 
 SPECIAL:
-- Sometimes reply only "Nice" when slightly annoyed (rarely)
+- Sometimes reply only "Nice" when slightly annoyed 
 
 IMPORTANT:
 - Never joke in serious situations
@@ -33,14 +38,7 @@ let chatHistory = [
 
 export default async function handler(req, res) {
   try {
-    // 🔍 DEBUG FIRST
     console.log("KEY EXISTS:", !!process.env.OPENROUTER_API_KEY);
-
-    if (!process.env.OPENROUTER_API_KEY) {
-      return res.status(500).json({
-        reply: "Monkuu… server key missing 😐"
-      });
-    }
 
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
@@ -58,7 +56,7 @@ export default async function handler(req, res) {
       chatHistory.splice(1, 2);
     }
 
-    // ✅ STABLE MODEL (important change)
+    // ✅ OpenRouter call (stable model)
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -66,31 +64,32 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "mistralai/mistral-7b-instruct", // 🔥 changed (more stable)
-        messages: chatHistory,
-        temperature: 0.8,
-        max_tokens: 100
+        model: "openchat/openchat-3.5-0106",
+        messages: chatHistory
       }),
     });
 
     const data = await response.json();
 
-    // 🔍 FULL DEBUG
     console.log("OPENROUTER RESPONSE:", JSON.stringify(data, null, 2));
 
-    // ❌ If API error
+    // ❌ If API gives error → don't crash
     if (data.error) {
-      return res.status(500).json({
-        reply: `Monkuu… API error 😐 (${data.error.message})`
+      console.log("API ERROR:", data.error);
+
+      return res.status(200).json({
+        reply: "Monkuu… network acting weird, but I’m here 😏"
       });
     }
 
     let reply = data?.choices?.[0]?.message?.content;
 
+    // fallback
     if (!reply) {
       reply = "Monkuu… something feels off but I’m still here ❤️";
     }
 
+    // enforce name
     if (!reply.toLowerCase().includes("monkuu")) {
       reply = `Monkuu… ${reply}`;
     }
@@ -102,7 +101,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("ERROR:", error);
 
-    return res.status(500).json({
+    return res.status(200).json({
       reply: "Monkuu… something broke but I’m still here ❤️",
     });
   }
