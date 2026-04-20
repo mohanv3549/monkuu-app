@@ -1,12 +1,4 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const app = express();
-app.use(cors());
-app.use(express.json());
+// api/chat.js
 
 // ✅ System prompt (UNCHANGED)
 const SYSTEM_PROMPT = `
@@ -55,14 +47,18 @@ IMPORTANT:
 - Always prioritize her safety and emotions
 - Balance teasing with care
 `;
-
-// ✅ Memory
+// ✅ Memory (same as before)
 let chatHistory = [
   { role: "system", content: SYSTEM_PROMPT }
 ];
 
-app.post("/chat", async (req, res) => {
+// ✅ Vercel handler (replaces express)
+export default async function handler(req, res) {
   try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
+
     const userMessage = req.body.message;
 
     if (!userMessage || userMessage.trim() === "") {
@@ -75,14 +71,14 @@ app.post("/chat", async (req, res) => {
       chatHistory.splice(1, 2);
     }
 
-    // ✅ OpenRouter call (FIXED)
+    // ✅ OpenRouter call
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:3000",   // REQUIRED
-        "X-Title": "monkuu-app"                    // REQUIRED
+        "HTTP-Referer": "https://monkuu-app.vercel.app", // 🔥 change this after deploy
+        "X-Title": "monkuu-app"
       },
       body: JSON.stringify({
         model: "meta-llama/llama-3-8b-instruct",
@@ -94,44 +90,29 @@ app.post("/chat", async (req, res) => {
 
     const data = await response.json();
 
-    // 🔍 DEBUG (inside async)
-    console.log("FULL RESPONSE:", JSON.stringify(data, null, 2));
-
     let reply = "";
 
     if (data?.choices && data.choices.length > 0) {
       reply = data.choices[0]?.message?.content;
     }
 
-    // ❗ fallback only if truly empty
     if (!reply) {
       reply = "Monkuu… something feels off but I’m still here ❤️";
     }
 
-    // ✅ enforce name
     if (!reply.toLowerCase().includes("monkuu")) {
       reply = `Monkuu… ${reply}`;
     }
 
     chatHistory.push({ role: "assistant", content: reply });
 
-    res.json({ reply });
+    return res.status(200).json({ reply });
 
   } catch (error) {
     console.error("Error:", error.message);
 
-    res.json({
+    return res.status(500).json({
       reply: "Monkuu… something broke but I’m still here ❤️",
     });
   }
-});
-
-// ✅ Health
-app.get("/", (req, res) => {
-  res.send("Server running ❤️");
-});
-
-// ✅ Start
-app.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
-});
+}
