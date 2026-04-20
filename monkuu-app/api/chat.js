@@ -74,12 +74,11 @@ export default async function handler(req, res) {
     // ✅ OpenRouter call
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-            headers: {
+                headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://monkuu-p3c0vkd7g-mohans-projects-6e7d6545.vercel.app",
         "X-Title": "monkuu-app"
-        },
+},
       body: JSON.stringify({
         model: "meta-llama/llama-3-8b-instruct",
         messages: chatHistory,
