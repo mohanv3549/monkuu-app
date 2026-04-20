@@ -11,15 +11,6 @@ PRIORITY RULE:
 - If she is in danger, scared, sad, or serious → STOP teasing immediately
 - Switch to caring, protective, and supportive mode
 
-RELATIONSHIP STYLE:
-- You are in a long-distance relationship
-- You check on her daily habits (food, rest, etc.)
-
-BEHAVIOR:
-- Normal mood → playful, teasing, light roasting
-- Serious/sad → calm, caring, protective
-- If she skips meals → remind her to eat
-
 STYLE:
 - Keep replies short (2–4 lines max)
 - Always address her as "Monkuu"
@@ -38,58 +29,91 @@ let chatHistory = [
 
 export default async function handler(req, res) {
   try {
-    console.log("KEY EXISTS:", !!process.env.OPENROUTER_API_KEY);
-
+    // ✅ ENV check
     if (!process.env.OPENROUTER_API_KEY) {
-      return res.status(500).json({
+      return res.status(200).json({
         reply: "Monkuu… API key missing 😐"
       });
     }
 
+    // ✅ Method check
     if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
+      return res.status(200).json({
+        reply: "Monkuu… wrong request 😐"
+      });
     }
 
-    const { message } = req.body;
+    // ✅ Safe body parsing
+    const body = req.body || {};
+    const message = body.message || "";
 
-    if (!message || message.trim() === "") {
-      return res.status(400).json({ error: "Message is required" });
+    if (!message.trim()) {
+      return res.status(200).json({
+        reply: "Monkuu… say something 😏"
+      });
     }
 
+    // ✅ Maintain memory safely
     chatHistory.push({ role: "user", content: message });
-
-    if (chatHistory.length > 12) {
+    if (chatHistory.length > 10) {
       chatHistory.splice(1, 2);
     }
+
+    // ✅ Timeout protection
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "openchat/openchat-3.5-0106",
         messages: chatHistory
       }),
+      signal: controller.signal
     });
 
-    const data = await response.json();
+    clearTimeout(timeout);
+
+    // ❗ Handle non-200 responses
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("OPENROUTER HTTP ERROR:", text);
+
+      return res.status(200).json({
+        reply: "Monkuu… AI not responding properly 😐"
+      });
+    }
+
+    let data;
+
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error("JSON PARSE ERROR");
+      return res.status(200).json({
+        reply: "Monkuu… something went wrong with AI response 😐"
+      });
+    }
 
     console.log("OPENROUTER RESPONSE:", JSON.stringify(data, null, 2));
 
     if (data.error) {
       return res.status(200).json({
-        reply: "Monkuu… something wrong with AI, but I’m here 😏"
+        reply: "Monkuu… AI acting weird today 😏"
       });
     }
 
     let reply = data?.choices?.[0]?.message?.content;
 
     if (!reply) {
-      reply = "Monkuu… something feels off but I’m still here ❤️";
+      reply = "Monkuu… I’m here ❤️";
     }
 
+    // ✅ Ensure personality
     if (!reply.toLowerCase().includes("monkuu")) {
       reply = `Monkuu… ${reply}`;
     }
@@ -99,10 +123,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ reply });
 
   } catch (error) {
-    console.error("ERROR:", error);
+    console.error("SERVER ERROR:", error.message);
 
-    return res.status(500).json({
-      reply: "Monkuu… something broke but I’m still here ❤️",
+    return res.status(200).json({
+      reply: "Monkuu… server got tired 😐 try again"
     });
   }
 }
