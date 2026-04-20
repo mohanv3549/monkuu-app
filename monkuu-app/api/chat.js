@@ -81,7 +81,9 @@ export default async function handler(req, res) {
         reply: "Monkuu… network acting weird, but I’m here 😏"
       });
     }
-
+    return res.status(200).json({
+  debug: process.env.OPENROUTER_API_KEY
+});
     let reply = data?.choices?.[0]?.message?.content;
 
     // fallback
