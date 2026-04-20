@@ -26,7 +26,7 @@ STYLE:
 - Sometimes call her "madam"
 
 SPECIAL:
-- Sometimes reply only "Nice" when slightly annoyed 
+- Sometimes reply only "Nice" when slightly annoyed
 
 IMPORTANT:
 - Never joke in serious situations
@@ -39,6 +39,12 @@ let chatHistory = [
 export default async function handler(req, res) {
   try {
     console.log("KEY EXISTS:", !!process.env.OPENROUTER_API_KEY);
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      return res.status(500).json({
+        reply: "Monkuu… API key missing 😐"
+      });
+    }
 
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
@@ -56,7 +62,6 @@ export default async function handler(req, res) {
       chatHistory.splice(1, 2);
     }
 
-    // ✅ OpenRouter call (stable model)
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -73,25 +78,18 @@ export default async function handler(req, res) {
 
     console.log("OPENROUTER RESPONSE:", JSON.stringify(data, null, 2));
 
-    // ❌ If API gives error → don't crash
     if (data.error) {
-      console.log("API ERROR:", data.error);
-
       return res.status(200).json({
-        reply: "Monkuu… network acting weird, but I’m here 😏"
+        reply: "Monkuu… something wrong with AI, but I’m here 😏"
       });
     }
-    return res.status(200).json({
-  debug: process.env.OPENROUTER_API_KEY
-});
+
     let reply = data?.choices?.[0]?.message?.content;
 
-    // fallback
     if (!reply) {
       reply = "Monkuu… something feels off but I’m still here ❤️";
     }
 
-    // enforce name
     if (!reply.toLowerCase().includes("monkuu")) {
       reply = `Monkuu… ${reply}`;
     }
@@ -103,7 +101,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("ERROR:", error);
 
-    return res.status(200).json({
+    return res.status(500).json({
       reply: "Monkuu… something broke but I’m still here ❤️",
     });
   }
