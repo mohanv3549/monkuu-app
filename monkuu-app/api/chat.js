@@ -22,111 +22,61 @@ SPECIAL:
 IMPORTANT:
 - Never joke in serious situations
 `;
-
-let chatHistory = [
-  { role: "system", content: SYSTEM_PROMPT }
-];
-
 export default async function handler(req, res) {
   try {
-    // ✅ ENV check
-    if (!process.env.OPENROUTER_API_KEY) {
-      return res.status(200).json({
-        reply: "Monkuu… API key missing 😐"
-      });
-    }
-
-    // ✅ Method check
     if (req.method !== "POST") {
-      return res.status(200).json({
-        reply: "Monkuu… wrong request 😐"
-      });
+      return res.status(200).json({ reply: "Monkuu… wrong request 😐" });
     }
 
-    // ✅ Safe body parsing
-    const body = req.body || {};
-    const message = body.message || "";
+    const { message } = req.body || {};
 
-    if (!message.trim()) {
-      return res.status(200).json({
-        reply: "Monkuu… say something 😏"
-      });
+    if (!message) {
+      return res.status(200).json({ reply: "Monkuu… say something 😏" });
     }
 
-    // ✅ Maintain memory safely
-    chatHistory.push({ role: "user", content: message });
-    if (chatHistory.length > 10) {
-      chatHistory.splice(1, 2);
-    }
+    const prompt = `${SYSTEM_PROMPT}\nUser: ${message}\nMohan:`;
 
-    // ✅ Timeout protection
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.HF_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          inputs: prompt
+        })
+      }
+    );
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "openchat/openchat-3.5-0106",
-        messages: chatHistory
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeout);
-
-    // ❗ Handle non-200 responses
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("OPENROUTER HTTP ERROR:", text);
-
-      return res.status(200).json({
-        reply: "Monkuu… AI not responding properly 😐"
-      });
-    }
+    const text = await response.text();
 
     let data;
-
     try {
-      data = await response.json();
-    } catch (e) {
-      console.error("JSON PARSE ERROR");
+      data = JSON.parse(text);
+    } catch {
       return res.status(200).json({
-        reply: "Monkuu… something went wrong with AI response 😐"
+        reply: "Monkuu… server waking up ⏳"
       });
     }
 
-    console.log("OPENROUTER RESPONSE:", JSON.stringify(data, null, 2));
-
-    if (data.error) {
-      return res.status(200).json({
-        reply: "Monkuu… AI acting weird today 😏"
-      });
-    }
-
-    let reply = data?.choices?.[0]?.message?.content;
+    let reply = data?.[0]?.generated_text;
 
     if (!reply) {
       reply = "Monkuu… I’m here ❤️";
     }
 
-    // ✅ Ensure personality
     if (!reply.toLowerCase().includes("monkuu")) {
       reply = `Monkuu… ${reply}`;
     }
 
-    chatHistory.push({ role: "assistant", content: reply });
-
     return res.status(200).json({ reply });
 
-  } catch (error) {
-    console.error("SERVER ERROR:", error.message);
-
+  } catch (err) {
+    console.error(err);
     return res.status(200).json({
-      reply: "Monkuu… server got tired 😐 try again"
+      reply: "Monkuu… something broke 😐"
     });
   }
 }
