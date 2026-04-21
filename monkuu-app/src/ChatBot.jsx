@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "./firebase";
 
 function ChatBot() {
   const [msg, setMsg] = useState("");
@@ -13,13 +15,31 @@ function ChatBot() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, loading]);
 
+  // 🔥 Save message (NEW)
+  const saveMessage = async (text, sender) => {
+    try {
+      await addDoc(collection(db, "chats", "monkuu", "messages"), {
+        text,
+        sender,
+        time: Date.now(),
+      });
+    } catch (e) {
+      console.error("Save error:", e);
+    }
+  };
+
   const sendMessage = async () => {
     if (!msg.trim() || loading) return;
 
     const userMessage = msg;
     setMsg("");
 
+    // UI update
     setChat((prev) => [...prev, { type: "user", text: userMessage }]);
+
+    // 🔥 Save user message
+    saveMessage(userMessage, "you");
+
     setLoading(true);
 
     try {
@@ -27,15 +47,27 @@ function ChatBot() {
         message: userMessage,
       });
 
+      const reply = res.data.reply;
+
+      // UI update
       setChat((prev) => [
         ...prev,
-        { type: "bot", text: res.data.reply },
+        { type: "bot", text: reply },
       ]);
+
+      // 🔥 Save AI reply
+      saveMessage(reply, "ai");
+
     } catch {
+      const fallback = "Monkuu… something broke 😒";
+
       setChat((prev) => [
         ...prev,
-        { type: "bot", text: "Monkuu… something broke 😒" },
+        { type: "bot", text: fallback },
       ]);
+
+      // 🔥 Save fallback also
+      saveMessage(fallback, "ai");
     }
 
     setLoading(false);
