@@ -16,17 +16,23 @@ function ChatBot() {
   }, [chat, loading]);
 
   // 🔥 Save message (NEW)
-  const saveMessage = async (text, sender) => {
-    try {
-      await addDoc(collection(db, "chats", "monkuu", "messages"), {
+const saveMessage = async (text, sender) => {
+  try {
+    const docRef = await addDoc(
+      collection(db, "chats", "monkuu", "messages"),
+      {
         text,
         sender,
         time: Date.now(),
-      });
-    } catch (e) {
-      console.error("Save error:", e);
-    }
-  };
+      }
+    );
+
+    console.log("Saved ID:", docRef.id); // ✅ THIS IS IMPORTANT
+
+  } catch (e) {
+    console.error("🔥 Firebase error:", e); // 👈 YOU WILL SEE REAL ERROR
+  }
+};
 
   const sendMessage = async () => {
     if (!msg.trim() || loading) return;
